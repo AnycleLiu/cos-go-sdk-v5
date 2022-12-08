@@ -263,13 +263,6 @@ func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method s
 }
 
 func (c *Client) doAPI(ctx context.Context, req *http.Request, result interface{}, closeBody bool) (*Response, error) {
-	//如果context已经被取消，直接返回（如果没有这个逻辑，ctx被取消了，retry还是会调用doApi）
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
 	var cancel context.CancelFunc
 	if closeBody {
 		ctx, cancel = context.WithCancel(ctx)
@@ -370,6 +363,12 @@ func (c *Client) doRetry(ctx context.Context, opt *sendOptions) (resp *Response,
 	nr := 0
 	interval := c.Conf.RetryOpt.Interval
 	for nr < count {
+		//如果context已经被取消，直接返回
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		resp, err = c.send(ctx, opt)
 		if err != nil && err != invalidBucketErr {
 			if resp != nil && resp.StatusCode <= 499 {
